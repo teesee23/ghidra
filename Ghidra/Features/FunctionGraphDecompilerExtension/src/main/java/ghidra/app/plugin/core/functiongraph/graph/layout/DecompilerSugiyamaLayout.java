@@ -62,28 +62,39 @@ public class DecompilerSugiyamaLayout extends AbstractFGLayout {
 	private DecompilerBlockGraph blockGraphRoot;
 
 	/* Tom here */
-	Set<FGVertex> onStack = new HashSet<FGVertex>();
+	Vector<FGVertex> onStack = new Vector<FGVertex>();
 	Set<FGVertex> visited = new HashSet<FGVertex>();
 
 	Vector<FGVertex> longestPath = new Vector<FGVertex>();
-	Vector<FGVertex> currentPath = new Vector<FGVertex>();
+	
 
 
 	private void removeCycles(FGVertex vertex, VisualGraph<FGVertex, FGEdge> jungGraph) {
-		if(visited.contains(vertex)) {
-			return;
-		}
+		//if(visited.contains(vertex)) {
+		//	return;
+		//}
 
 		visited.add(vertex);
 		onStack.add(vertex);
 	
+		if(jungGraph.getOutEdges(vertex).size() == 0) {
+				/* we have a leaf node, copy the stack */
+				Msg.debug(this, "Leaf node, stack size: " + onStack.size());
+			if(onStack.size() > longestPath.size()) {
+				longestPath = (Vector<FGVertex>)onStack.clone();
+			}
+		}
+
 
 		for(FGEdge edge: jungGraph.getOutEdges(vertex)) {
 			FGVertex target = edge.getEnd();
+			
+			
 			if(onStack.contains(target)) {
 				jungGraph.removeEdge(edge);
 				//jungGraph.addEdge(edge, target, vertex);
 			}else {
+				
 				removeCycles(target, jungGraph);
 			}
 		}
@@ -179,6 +190,9 @@ public class DecompilerSugiyamaLayout extends AbstractFGLayout {
 		}
 
 		Msg.debug(this, "Longest Path: " + longestPath.size());
+
+		FGVertex v = longestPath.get(0);
+		Msg.debug(this, "InEdges: " + jungGraph.getInEdges(v) + " OutEdges: " + jungGraph.getOutEdges(v));
 
 		/* end Tom */
 
