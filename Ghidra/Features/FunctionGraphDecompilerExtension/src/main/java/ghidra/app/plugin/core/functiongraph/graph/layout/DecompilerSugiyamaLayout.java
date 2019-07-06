@@ -181,20 +181,7 @@ public class DecompilerSugiyamaLayout extends AbstractFGLayout {
 		debug("\n\n");
 		printConvertedStructure(0, blockGraphRoot);
 
-		/* Tom here, needs to move into assignCoordinates */
-		VisualGraph<FGVertex, FGEdge> tempGraph = jungGraph.copy();
 
-		for(FGVertex vertex: jungGraph.getVertices()) {
-			/* make acyclic graph */
-			removeCycles(vertex, tempGraph);
-		}
-
-		Msg.debug(this, "Longest Path: " + longestPath.size());
-
-		FGVertex v = longestPath.get(0);
-		Msg.debug(this, "InEdges: " + jungGraph.getInEdges(v) + " OutEdges: " + jungGraph.getOutEdges(v));
-
-		/* end Tom */
 
 		GridLocationMap<FGVertex, FGEdge> gridLocations =
 			assignCoordinates(jungGraph, blockGraphRoot);
@@ -538,22 +525,77 @@ public class DecompilerSugiyamaLayout extends AbstractFGLayout {
 		return buffy.toString();
 	}
 
+	private void assignRows(FGVertex v, int row, GridLocationMap<FGVertex, FGEdge> gridLocations, VisualGraph<FGVertex, FGEdge> jungGraph, DecompilerBlockGraph root) {
+		/* if we intersect with longest path, dont update row */
+		Msg.debug(this, "We are in assignRows with vertex: " + v);
+
+		// if(longestPath.contains(v) && longestPath.get(0) != v)
+		// 	return;
+
+		/* TODO: log visited */
+		if(!longestPath.contains(v)) {
+			DecompilerBlock block = root.getBlock(v);
+			block.setCol(0);
+			block.setRow(row);
+		}
+		Msg.debug(this, "Setting row: " + row);
+		for(FGEdge e : jungGraph.getOutEdges(v)) {
+			FGVertex vtx = e.getEnd();
+			Msg.debug(this, "about to call assignRows with " + vtx + " from " + v);
+
+			assignRows(vtx, row+1, gridLocations, jungGraph, root);
+		}
+
+
+
+
+	}
 	private GridLocationMap<FGVertex, FGEdge> assignCoordinates(
 			VisualGraph<FGVertex, FGEdge> jungGraph, DecompilerBlockGraph root) {
 		GridLocationMap<FGVertex, FGEdge> gridLocations = new GridLocationMap<>();
 
-		root.setCol(0);  // recursive
-		debug("\n\n");
-		root.setRows(0); // recursive
-		int col = 0;
-		int row = 0;
+		/* Tom here, needs to move into assignCoordinates */
+		VisualGraph<FGVertex, FGEdge> tempGraph = jungGraph.copy();
+
+		for(FGVertex vertex: jungGraph.getVertices()) {
+			/* make acyclic graph */
+			removeCycles(vertex, tempGraph);
+		}
+
+		for(FGVertex vertex: tempGraph.getVertices()) {
+			/* make acyclic graph */
+			Msg.debug(this, "Vertex: " +vertex + " outedges: " + tempGraph.getOutEdges(vertex));
+		}
+
+		Msg.debug(this, "Longest Path--: " + longestPath.size());
+
+		/* do rows for longest path first */
+		for(int i=0;i<longestPath.size();i++) {
+			FGVertex v = longestPath.get(i);
+			DecompilerBlock block = root.getBlock(v);
+			block.setCol(1);
+			block.setRow(i);
+			Msg.debug(this, "Setting longest path node: " + i);
+		}
+
+		/* Then assign all other rows */
+		FGVertex rootVertex = longestPath.get(0);
+		assignRows(rootVertex, 0, gridLocations, tempGraph, root);
+
+		/* end Tom */
+
+		//root.setCol(0);  // recursive
+		//debug("\n\n");
+		//root.setRows(0); // recursive
+		
 
 		Collection<FGVertex> vertices = jungGraph.getVertices();
 		for (FGVertex vertex : vertices) {
 			DecompilerBlock block = root.getBlock(vertex);
-			//int col = block.getCol();
-			//int row = block.getRow();
-			gridLocations.set(vertex, row++, col);
+			int col = block.getCol();
+			int row = block.getRow();
+			Msg.debug(this, vertex + " row: " + row + " col: " + col);
+			gridLocations.set(vertex, row, col);
 		}
 
 		return gridLocations;
