@@ -525,7 +525,7 @@ public class DecompilerSugiyamaLayout extends AbstractFGLayout {
 		return buffy.toString();
 	}
 
-	private void assignRows(FGVertex v, int row, GridLocationMap<FGVertex, FGEdge> gridLocations, VisualGraph<FGVertex, FGEdge> jungGraph, DecompilerBlockGraph root) {
+	private void assignRows(FGVertex v, int row, int col, GridLocationMap<FGVertex, FGEdge> gridLocations, VisualGraph<FGVertex, FGEdge> jungGraph, DecompilerBlockGraph root) {
 		/* if we intersect with longest path, dont update row */
 		Msg.debug(this, "We are in assignRows with vertex: " + v);
 
@@ -533,18 +533,22 @@ public class DecompilerSugiyamaLayout extends AbstractFGLayout {
 		// 	return;
 
 		/* TODO: log visited */
+		
 		if(!longestPath.contains(v)) {
 			DecompilerBlock block = root.getBlock(v);
-			block.setCol(0);
+			block.setCol(col);
 			block.setRow(row);
 		}
+		int origcol = col;
 		Msg.debug(this, "Setting row: " + row);
 		for(FGEdge e : jungGraph.getOutEdges(v)) {
 			FGVertex vtx = e.getEnd();
 			Msg.debug(this, "about to call assignRows with " + vtx + " from " + v);
-
-			assignRows(vtx, row+1, gridLocations, jungGraph, root);
+			
+			assignRows(vtx, row+1, col, gridLocations, jungGraph, root);
+			col++;
 		}
+		col = origcol;
 
 
 
@@ -573,14 +577,14 @@ public class DecompilerSugiyamaLayout extends AbstractFGLayout {
 		for(int i=0;i<longestPath.size();i++) {
 			FGVertex v = longestPath.get(i);
 			DecompilerBlock block = root.getBlock(v);
-			block.setCol(1);
+			block.setCol(0);
 			block.setRow(i);
 			Msg.debug(this, "Setting longest path node: " + i);
 		}
 
 		/* Then assign all other rows */
 		FGVertex rootVertex = longestPath.get(0);
-		assignRows(rootVertex, 0, gridLocations, tempGraph, root);
+		assignRows(rootVertex, 0, 1, gridLocations, tempGraph, root);
 
 		/* end Tom */
 
