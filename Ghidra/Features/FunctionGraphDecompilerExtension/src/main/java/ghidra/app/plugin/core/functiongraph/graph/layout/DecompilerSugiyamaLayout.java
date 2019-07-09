@@ -315,22 +315,28 @@ public class DecompilerSugiyamaLayout extends AbstractFGLayout {
 					Rectangle bounds = shape.getBounds();
 					double vertexBottom = start.getY() + (bounds.height >> 1); // location is centered
 
+					Shape endShape = transformer.apply(endVertex);
+					Rectangle endBounds = endShape.getBounds();
+					double endVertexTopY = end.getY() - (endBounds.height >> 1);
+					
+					
+
 					double x1 = start.getX() + direction;
 					double y1 = start.getY(); // hidden
 					articulations.add(new Point2D.Double(x1, y1));
 
 					double x2 = x1;
 					double y2 = vertexBottom + offsetFromVertex;
-					y2 = end.getY();
+					//y2 = end.getY();
 					articulations.add(new Point2D.Double(x2, y2));
 
-					double x3 = end.getX() + (-direction);
+					double x3 = end.getX(); // + (-direction);
 					double y3 = y2;
 					articulations.add(new Point2D.Double(x3, y3));
 
-//					double x4 = x3;
-//					double y4 = end.getY(); // hidden
-//					articulations.add(new Point2D.Double(x4, y4));
+					double x4 = x3;
+					double y4 = endVertexTopY; // hidden
+					articulations.add(new Point2D.Double(x4, y4));
 				}
 
 				else if (startCol.index > endCol.index) { // flow return
@@ -340,20 +346,25 @@ public class DecompilerSugiyamaLayout extends AbstractFGLayout {
 					Rectangle bounds = shape.getBounds();
 					double vertexBottom = start.getY() + (bounds.height >> 1); // location is centered
 
+					Shape endShape = transformer.apply(endVertex);
+					Rectangle endBounds = endShape.getBounds();
+					double endVertexTopY = end.getY() - (endBounds.height >> 1);
+					
 					double x1 = start.getX() + (direction);
 					double y1 = start.getY(); // hidden
 					articulations.add(new Point2D.Double(x1, y1));
 
 					double x2 = x1;
-					double y2 = vertexBottom + offsetFromVertex;
+					//double y2 = vertexBottom + offsetFromVertex;
+					double y2 = end.getY() - offsetFromVertex;
 					articulations.add(new Point2D.Double(x2, y2));
 
-					double x3 = end.getX() + (-direction);
+					double x3 = end.getX();// + (-direction);
 					double y3 = y2;
 					articulations.add(new Point2D.Double(x3, y3));
 
 					double x4 = x3;
-					double y4 = end.getY(); // hidden
+					double y4 = endVertexTopY;//end.getY(); // hidden
 					articulations.add(new Point2D.Double(x4, y4));
 				}
 
@@ -527,7 +538,7 @@ public class DecompilerSugiyamaLayout extends AbstractFGLayout {
 
 	private void assignRows(FGVertex v, int row, int col, GridLocationMap<FGVertex, FGEdge> gridLocations, VisualGraph<FGVertex, FGEdge> jungGraph, DecompilerBlockGraph root) {
 		/* if we intersect with longest path, dont update row */
-		Msg.debug(this, "We are in assignRows with vertex: " + v);
+		//Msg.debug(this, "We are in assignRows with vertex: " + v);
 
 		// if(longestPath.contains(v) && longestPath.get(0) != v)
 		// 	return;
@@ -539,16 +550,18 @@ public class DecompilerSugiyamaLayout extends AbstractFGLayout {
 			block.setCol(col);
 			block.setRow(row);
 		}
-		int origcol = col;
+		int colnum = 0;
 		Msg.debug(this, "Setting row: " + row);
 		for(FGEdge e : jungGraph.getOutEdges(v)) {
 			FGVertex vtx = e.getEnd();
-			Msg.debug(this, "about to call assignRows with " + vtx + " from " + v);
+			//Msg.debug(this, "about to call assignRows with " + vtx + " from " + v);
+			if(colnum == 0 && !longestPath.contains(vtx))
+				colnum++;
 			
-			assignRows(vtx, row+1, col, gridLocations, jungGraph, root);
-			col++;
+			assignRows(vtx, row+1, colnum, gridLocations, jungGraph, root);
+			colnum++;
 		}
-		col = origcol;
+		
 
 
 
