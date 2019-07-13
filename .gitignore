@@ -35,7 +35,9 @@ Thumbs.db
 *.settings
 *.directory
 .gradle/
-
+GPL/nativeBuildProperties.gradle
+build.gradle
+gradle/root/distribution.gradle
 # File locks
 *.ulock
 *.lock
