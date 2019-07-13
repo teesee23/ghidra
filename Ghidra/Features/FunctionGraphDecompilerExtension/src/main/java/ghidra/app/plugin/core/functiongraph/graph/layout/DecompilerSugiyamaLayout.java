@@ -79,7 +79,7 @@ public class DecompilerSugiyamaLayout extends AbstractFGLayout {
 	
 		if(jungGraph.getOutEdges(vertex).size() == 0) {
 				/* we have a leaf node, copy the stack */
-				Msg.debug(this, "Leaf node, stack size: " + onStack.size());
+				
 			if(onStack.size() > longestPath.size()) {
 				longestPath = (Vector<FGVertex>)onStack.clone();
 			}
@@ -582,8 +582,19 @@ public class DecompilerSugiyamaLayout extends AbstractFGLayout {
 		if(!longestPath.contains(v)) {
 			DecompilerBlock block = root.getBlock(v);
 			block.setCol(col);
-			block.setRow(row);
+			Address address = v.getVertexAddress();
+			int newrow = getRowGreaterThanAddress(row, address, jungGraph, root);
+			if(newrow != -1) {
+				shiftRowsDown(newrow, 1, jungGraph, root);
+				block.setRow(newrow);
+
+			}
+			else
+				block.setRow(row);
 		}
+
+		visited.add(v);
+
 		int colnum = 0;
 		Msg.debug(this, "Setting row: " + row);
 		for(FGEdge e : jungGraph.getOutEdges(v)) {
@@ -614,8 +625,10 @@ public class DecompilerSugiyamaLayout extends AbstractFGLayout {
 
 		for (FGVertex v : visited) {
 			DecompilerBlock block = root.getBlock(v);
-			if (block.getRow() >= startRow && v.getVertexAddress().compareTo(address) > 0)
+			if (block.getRow() >= startRow && v.getVertexAddress().compareTo(address) > 0) {
+				Msg.debug(this, "Vertex at address: " + address + "should be placed above row: " + block.getRow() + " v: " + v);
 				return block.getRow();
+			}
 		}
 
 		return -1;
@@ -705,12 +718,12 @@ public class DecompilerSugiyamaLayout extends AbstractFGLayout {
 			removeCycles(vertex, tempGraph);
 		}
 
-		for(FGVertex vertex: tempGraph.getVertices()) {
+		//for(FGVertex vertex: tempGraph.getVertices()) {
 			/* make acyclic graph */
-			Msg.debug(this, "Vertex: " +vertex + " outedges: " + tempGraph.getOutEdges(vertex));
-		}
+			//Msg.debug(this, "Vertex: " +vertex + " outedges: " + tempGraph.getOutEdges(vertex));
+		//}
 
-		Msg.debug(this, "Longest Path--: " + longestPath.size());
+		//Msg.debug(this, "Longest Path--: " + longestPath.size());
 
 		/* do rows for longest path first */
 		for(int i=0;i<longestPath.size();i++) {
@@ -718,10 +731,12 @@ public class DecompilerSugiyamaLayout extends AbstractFGLayout {
 			DecompilerBlock block = root.getBlock(v);
 			block.setCol(0);
 			block.setRow(i);
-			Msg.debug(this, "Setting longest path node: " + i);
+			//Msg.debug(this, "Setting longest path node: " + i);
 		}
 
 		/* Then assign all other rows */
+		visited.clear();
+		visited = (Vector<FGVertex>)longestPath.clone();
 		FGVertex rootVertex = longestPath.get(0);
 		assignRowsAndCols(rootVertex, 0, 1, gridLocations, tempGraph, root);
 
