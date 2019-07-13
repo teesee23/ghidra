@@ -63,7 +63,7 @@ public class DecompilerSugiyamaLayout extends AbstractFGLayout {
 
 	/* Tom here */
 	Vector<FGVertex> onStack = new Vector<FGVertex>();
-	Set<FGVertex> visited = new HashSet<FGVertex>();
+	Vector<FGVertex> visited = new Vector<FGVertex>();
 
 	Vector<FGVertex> longestPath = new Vector<FGVertex>();
 	
@@ -74,7 +74,7 @@ public class DecompilerSugiyamaLayout extends AbstractFGLayout {
 		//	return;
 		//}
 
-		visited.add(vertex);
+		
 		onStack.add(vertex);
 	
 		if(jungGraph.getOutEdges(vertex).size() == 0) {
@@ -267,7 +267,7 @@ public class DecompilerSugiyamaLayout extends AbstractFGLayout {
 
 			if (result > 0 && loop != null) {
 				// TODO better check for loops
-				routeLoopEdge(vertexLayoutLocations, layoutLocations, newEdgeArticulations, e,
+				routeLoopEdge(transformer, vertexLayoutLocations, layoutLocations, newEdgeArticulations, e,
 					startVertex, endVertex);
 			}
 			else {
@@ -279,6 +279,10 @@ public class DecompilerSugiyamaLayout extends AbstractFGLayout {
 
 				Column startCol = layoutLocations.col(startVertex);
 				Column endCol = layoutLocations.col(endVertex);
+
+				Row startRow = layoutLocations.row(startVertex);
+				Row endRow = layoutLocations.row(endVertex);
+
 				Point2D start = vertexLayoutLocations.get(startVertex);
 				Point2D end = vertexLayoutLocations.get(endVertex);
 				List<Point2D> articulations = new ArrayList<>();
@@ -330,6 +334,14 @@ public class DecompilerSugiyamaLayout extends AbstractFGLayout {
 					//y2 = end.getY();
 					articulations.add(new Point2D.Double(x2, y2));
 
+					//if end is not next row, route edge along col boundary
+					if(endRow.index - startRow.index > 1) { //going down more than one row
+						//route to edge of destination col
+						articulations.add(new Point2D.Double(endCol.x, vertexBottom + offsetFromVertex ));
+					}
+
+					//TODO: deal with when dest is at higher row than start
+
 					double x3 = end.getX(); // + (-direction);
 					double y3 = y2;
 					articulations.add(new Point2D.Double(x3, y3));
@@ -342,6 +354,11 @@ public class DecompilerSugiyamaLayout extends AbstractFGLayout {
 				else if (startCol.index > endCol.index) { // flow return
 					e.setAlpha(.25);
 
+					//double hspacer = (startRow.index + 1) * 5;
+					double hspacer = Math.abs((startRow.index - endRow.index)) * 5;
+					//double vspacer = (startCol.index + 1) * 5;
+					double vspacer = Math.abs((startCol.index - endCol.index));;
+
 					Shape shape = transformer.apply(startVertex);
 					Rectangle bounds = shape.getBounds();
 					double vertexBottom = start.getY() + (bounds.height >> 1); // location is centered
@@ -352,20 +369,25 @@ public class DecompilerSugiyamaLayout extends AbstractFGLayout {
 					
 					double x1 = start.getX() + (direction);
 					double y1 = start.getY(); // hidden
-					articulations.add(new Point2D.Double(x1, y1));
+					articulations.add(new Point2D.Double(x1 + hspacer, y1 + vspacer));
 
 					double x2 = x1;
-					//double y2 = vertexBottom + offsetFromVertex;
-					double y2 = end.getY() - offsetFromVertex;
-					articulations.add(new Point2D.Double(x2, y2));
+					double y2 = vertexBottom + offsetFromVertex;
+					articulations.add(new Point2D.Double(x2 + hspacer, y2 + vspacer));
 
-					double x3 = end.getX();// + (-direction);
-					double y3 = y2;
-					articulations.add(new Point2D.Double(x3, y3));
 
-					double x4 = x3;
-					double y4 = endVertexTopY;//end.getY(); // hidden
-					articulations.add(new Point2D.Double(x4, y4));
+					int endColWidth = endCol.getPaddedWidth(isCondensedLayout());
+					//if end is not next row, route edge along col boundary
+					if(endRow.index - startRow.index > 1) { //going down more than one row
+						//route to edge of destination col
+						articulations.add(new Point2D.Double(endCol.x + endColWidth + hspacer, vertexBottom + offsetFromVertex + vspacer ));
+					}
+
+					articulations.add(new Point2D.Double(endCol.x + endColWidth + hspacer, endVertexTopY - offsetFromVertex + vspacer));
+
+					articulations.add(new Point2D.Double(end.getX() + hspacer , endVertexTopY - offsetFromVertex + vspacer));
+
+					articulations.add(new Point2D.Double(end.getX() + hspacer,endVertexTopY));
 				}
 
 				else {  // same column--nothing to route
@@ -379,10 +401,14 @@ public class DecompilerSugiyamaLayout extends AbstractFGLayout {
 		return newEdgeArticulations;
 	}
 
-	private void routeLoopEdge(Map<FGVertex, Point2D> vertexLayoutLocations,
+	private void routeLoopEdge(VisualGraphVertexShapeTransformer<FGVertex> transformer, Map<FGVertex, Point2D> vertexLayoutLocations,
 			LayoutLocationMap<FGVertex, FGEdge> layoutLocations,
 			Map<FGEdge, List<Point2D>> newEdgeArticulations, FGEdge e, FGVertex startVertex,
 			FGVertex endVertex) {
+
+		int offsetFromVertex = isCondensedLayout()
+						? (int) (VERTEX_TO_EDGE_ARTICULATION_OFFSET * (1 - getCondenseFactor()))
+						: VERTEX_TO_EDGE_ARTICULATION_OFFSET;
 		// going backwards
 		List<Point2D> articulations = new ArrayList<>();
 
@@ -393,23 +419,31 @@ public class DecompilerSugiyamaLayout extends AbstractFGLayout {
 		// loop first point - same y coord as the vertex; x is the middle of the next col
 		Column outermostCol = getOutermostCol(layoutLocations, vertices);
 		Column afterColumn = layoutLocations.nextColumn(outermostCol);
+		Point2D startVertexPoint = vertexLayoutLocations.get(startVertex);
+		Point2D endVertexPoint = vertexLayoutLocations.get(endVertex);
+
+		Shape shape = transformer.apply(startVertex);
+		Rectangle bounds = shape.getBounds();
+		double vertexBottom = startVertexPoint.getY() + (bounds.height >> 1); // location is centered
 
 		int halfWidth = afterColumn.getPaddedWidth(isCondensedLayout()) >> 1;
 		double x = afterColumn.x + halfWidth; // middle of the column
 
-		Point2D startVertexPoint = vertexLayoutLocations.get(startVertex);
+		
 
-		double y1 = startVertexPoint.getY();
-		Point2D first = new Point2D.Double(x, y1);
-		articulations.add(first);
+		double x0 = startVertexPoint.getX();// + direction;
+		double y0 = startVertexPoint.getY(); // hidden
+		articulations.add(new Point2D.Double(x0, y0));
 
-		// loop second point - same y coord as destination; 
-		// 					   x is the col after the outermost dominated vertex
+		double x1 = x0;
+		double y1 = vertexBottom + offsetFromVertex;
+		articulations.add(new Point2D.Double(x1, y1));
 
-		Point2D endVertexPoint = vertexLayoutLocations.get(endVertex);
-		double y2 = endVertexPoint.getY();
-		Point2D second = new Point2D.Double(x, y2);
-		articulations.add(second);
+		double y2 = y1; //startVertexPoint.getY();
+		articulations.add(new Point2D.Double(x, y2));
+
+		double y3 = endVertexPoint.getY();
+		articulations.add(new Point2D.Double(x, y3));
 
 		newEdgeArticulations.put(e, articulations);
 	}
@@ -536,7 +570,7 @@ public class DecompilerSugiyamaLayout extends AbstractFGLayout {
 		return buffy.toString();
 	}
 
-	private void assignRows(FGVertex v, int row, int col, GridLocationMap<FGVertex, FGEdge> gridLocations, VisualGraph<FGVertex, FGEdge> jungGraph, DecompilerBlockGraph root) {
+	private void assignRowsAndCols(FGVertex v, int row, int col, GridLocationMap<FGVertex, FGEdge> gridLocations, VisualGraph<FGVertex, FGEdge> jungGraph, DecompilerBlockGraph root) {
 		/* if we intersect with longest path, dont update row */
 		//Msg.debug(this, "We are in assignRows with vertex: " + v);
 
@@ -558,15 +592,107 @@ public class DecompilerSugiyamaLayout extends AbstractFGLayout {
 			if(colnum == 0 && !longestPath.contains(vtx))
 				colnum++;
 			
-			assignRows(vtx, row+1, colnum, gridLocations, jungGraph, root);
+			assignRowsAndCols(vtx, row+1, colnum, gridLocations, jungGraph, root);
 			colnum++;
 		}
-		
+
+	}
 
 
+	private int numBlocksInCol(int colNum, int startRow, VisualGraph<FGVertex, FGEdge> jungGraph, DecompilerBlockGraph root ) {
+		int count = 0;
+		for (FGVertex v : jungGraph.getVertices()) {
+			DecompilerBlock block = root.getBlock(v);
+			if(block.getCol() == colNum && block.getRow() >= startRow)
+				count++;
+		}
+
+		return count;
+	}
+
+	private int getRowGreaterThanAddress(int startRow, Address address, VisualGraph<FGVertex, FGEdge> jungGraph, DecompilerBlockGraph root) {
+
+		for (FGVertex v : visited) {
+			DecompilerBlock block = root.getBlock(v);
+			if (block.getRow() >= startRow && v.getVertexAddress().compareTo(address) > 0)
+				return block.getRow();
+		}
+
+		return -1;
+
+	}
+
+	private void shiftRowsDown(int startRow, int numRows, VisualGraph<FGVertex, FGEdge> jungGraph, DecompilerBlockGraph root) {
+		for (FGVertex v : jungGraph.getVertices()) {
+			DecompilerBlock block = root.getBlock(v);
+			if (block.getRow() >= startRow) {
+				int row = block.getRow();
+				block.setRow(row+numRows);
+			}
+		}
+
+	}
+
+	private boolean doRowShifting(FGVertex rootNode, VisualGraph<FGVertex, FGEdge> jungGraph, DecompilerBlockGraph root) {
+		//for all edges
+		boolean changeMade = false;
+
+		for(FGEdge e : jungGraph.getOutEdges(rootNode)) {
+			FGVertex startVertex = e.getStart();
+			FGVertex endVertex = e.getEnd();
+			
+			Address startAddress = startVertex.getVertexAddress();
+			Address endAddress = endVertex.getVertexAddress();
+			int result = startAddress.compareTo(endAddress);
+			DecompilerBlock startBlock = root.getBlock(startVertex);
+			DecompilerBlock endBlock = root.getBlock(endVertex);
+			DecompilerBlock loop = endBlock.getParentLoop();
+
+			int startCol = startBlock.getCol();
+			int endCol = endBlock.getCol();
+			int startRow = startBlock.getRow();
+			int endRow = endBlock.getRow();
+
+			if(result > 0 && loop != null) /* ignore loops, shouldnt happen in DAG */
+				continue;
+
+			if(endRow > startRow && endAddress.compareTo(startAddress) > 0) {
+				//we need to make corrections!
+				//find correct row
+				int row = getRowGreaterThanAddress(startRow, endAddress, jungGraph, root);
+				//is there anything in this column below me that i need to care about?
+				//int numBlocksInColBelowMe = numBlocksInCol(endCol, endRow, jungGraph, root);
+				if(row != -1) {
+					/* potentially only do this for current col, for now do everything */
+					if(!longestPath.contains(endVertex)) {
+						shiftRowsDown(row, 1, jungGraph, root);
+						endBlock.setRow(row);
+						changeMade = true;
+					}
+				}
+					
+			}
+
+			visited.add(endVertex);
+
+			doRowShifting(endVertex, jungGraph ,root);
+
+
+		}
+		//if not a loop and end row < startRow
+
+		//find first row where address > curAddress
+
+		//add another col (if other things in that col)
+		//assign end vertice to this col and set row to start + 1;
+		//shift everything with row >= cur row && col >= curCol right one col
+		//repeat until everything sorted
+
+		return changeMade;
 
 
 	}
+
 	private GridLocationMap<FGVertex, FGEdge> assignCoordinates(
 			VisualGraph<FGVertex, FGEdge> jungGraph, DecompilerBlockGraph root) {
 		GridLocationMap<FGVertex, FGEdge> gridLocations = new GridLocationMap<>();
@@ -597,7 +723,16 @@ public class DecompilerSugiyamaLayout extends AbstractFGLayout {
 
 		/* Then assign all other rows */
 		FGVertex rootVertex = longestPath.get(0);
-		assignRows(rootVertex, 0, 1, gridLocations, tempGraph, root);
+		assignRowsAndCols(rootVertex, 0, 1, gridLocations, tempGraph, root);
+
+
+		/* uncomment when working */
+		//visited.clear();
+		//visited = (Vector<FGVertex>)longestPath.clone();
+		//doRowShifting(rootVertex, tempGraph ,root);
+		//while(graphChanged)
+		//	graphChanged = doRowShifting(jungGraph,root);
+
 
 		/* end Tom */
 
