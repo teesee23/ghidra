@@ -323,7 +323,10 @@ public class DecompilerSugiyamaLayout extends AbstractFGLayout {
 					Rectangle endBounds = endShape.getBounds();
 					double endVertexTopY = end.getY() - (endBounds.height >> 1);
 					
-					
+					//double hspacer = (startRow.index + 1) * 5;
+					double hspacer = Math.abs((startRow.index - endRow.index)) * 5;
+					//double vspacer = (startCol.index + 1) * 5;
+					double vspacer = Math.abs((startCol.index - endCol.index));;
 
 					double x1 = start.getX() + direction;
 					double y1 = start.getY(); // hidden
@@ -333,21 +336,24 @@ public class DecompilerSugiyamaLayout extends AbstractFGLayout {
 					double y2 = vertexBottom + offsetFromVertex;
 					//y2 = end.getY();
 					articulations.add(new Point2D.Double(x2, y2));
-
+					int endColWidth = endCol.getPaddedWidth(isCondensedLayout());
 					//if end is not next row, route edge along col boundary
 					if(endRow.index - startRow.index > 1) { //going down more than one row
 						//route to edge of destination col
-						articulations.add(new Point2D.Double(endCol.x, vertexBottom + offsetFromVertex ));
+						articulations.add(new Point2D.Double(endCol.x + endColWidth, vertexBottom + offsetFromVertex ));
+						articulations.add(new Point2D.Double(endCol.x + endColWidth, endVertexTopY - offsetFromVertex));
+						articulations.add(new Point2D.Double(end.getX(), endVertexTopY - offsetFromVertex));
+					}else {
+						articulations.add(new Point2D.Double(end.getX(), vertexBottom + offsetFromVertex));
+						articulations.add(new Point2D.Double(end.getX(), endVertexTopY - offsetFromVertex));
 					}
 
 					//TODO: deal with when dest is at higher row than start
 
-					double x3 = end.getX(); // + (-direction);
-					double y3 = y2;
-					articulations.add(new Point2D.Double(x3, y3));
+					
 
-					double x4 = x3;
-					double y4 = endVertexTopY; // hidden
+					double x4 = end.getX();
+					double y4 = endVertexTopY; 
 					articulations.add(new Point2D.Double(x4, y4));
 				}
 
@@ -393,6 +399,23 @@ public class DecompilerSugiyamaLayout extends AbstractFGLayout {
 				else {  // same column--nothing to route
 					// straight line, which is the default
 					e.setAlpha(.25);
+					int endColWidth = endCol.getPaddedWidth(isCondensedLayout());
+					Shape shape = transformer.apply(startVertex);
+					Rectangle bounds = shape.getBounds();
+					Shape endShape = transformer.apply(endVertex);
+					Rectangle endBounds = endShape.getBounds();
+					double vertexBottom = start.getY() + (bounds.height >> 1); // location is centered
+					double endVertexTopY = end.getY() - (endBounds.height >> 1);
+
+					if(endRow.index - startRow.index > 1) {
+						articulations.add(new Point2D.Double(start.getX(), start.getY()));
+						articulations.add(new Point2D.Double(start.getX(), vertexBottom + offsetFromVertex));
+						articulations.add(new Point2D.Double(endCol.x + endColWidth, vertexBottom + offsetFromVertex));
+						articulations.add(new Point2D.Double(endCol.x + endColWidth, endVertexTopY - offsetFromVertex));
+						articulations.add(new Point2D.Double(end.getX(), endVertexTopY - offsetFromVertex));
+						articulations.add(new Point2D.Double(end.getX(), endVertexTopY));
+
+					}
 				}
 				newEdgeArticulations.put(e, articulations);
 			}
@@ -740,13 +763,6 @@ public class DecompilerSugiyamaLayout extends AbstractFGLayout {
 		FGVertex rootVertex = longestPath.get(0);
 		assignRowsAndCols(rootVertex, 0, 1, gridLocations, tempGraph, root);
 
-
-		/* uncomment when working */
-		//visited.clear();
-		//visited = (Vector<FGVertex>)longestPath.clone();
-		//doRowShifting(rootVertex, tempGraph ,root);
-		//while(graphChanged)
-		//	graphChanged = doRowShifting(jungGraph,root);
 
 
 		/* end Tom */
